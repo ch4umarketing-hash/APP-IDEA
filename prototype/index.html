@@ -1,0 +1,213 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Multi-Store Shop MVP Prototype</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 0; background: #f5f7fb; color: #1f2937; }
+    header { background: #111827; color: #fff; padding: 12px 16px; }
+    main { padding: 16px; max-width: 1100px; margin: 0 auto; }
+    .card { background: #fff; border-radius: 10px; padding: 14px; margin-bottom: 12px; box-shadow: 0 1px 3px rgba(0,0,0,.08); }
+    .row { display: flex; gap: 10px; flex-wrap: wrap; }
+    input, select, button { padding: 8px; border-radius: 8px; border: 1px solid #d1d5db; }
+    button { background: #2563eb; color: #fff; border: none; cursor: pointer; }
+    button.secondary { background: #6b7280; }
+    table { width: 100%; border-collapse: collapse; font-size: 14px; }
+    th, td { border-bottom: 1px solid #e5e7eb; text-align: left; padding: 8px; }
+    .hidden { display: none; }
+    .pill { padding: 2px 8px; border-radius: 999px; font-size: 12px; background: #dbeafe; color: #1e40af; }
+  </style>
+</head>
+<body>
+  <header><strong>Multi-Store Mobile Shop — Interactive Prototype</strong></header>
+  <main>
+    <section id="loginCard" class="card">
+      <h2>Login</h2>
+      <p>Demo credentials: any email + password.</p>
+      <div class="row">
+        <input id="email" type="email" placeholder="Email" />
+        <input id="password" type="password" placeholder="Password" />
+        <button id="loginBtn">Sign In</button>
+      </div>
+    </section>
+
+    <section id="app" class="hidden">
+      <div class="card">
+        <h2>Dashboard</h2>
+        <div class="row">
+          <div class="card" style="flex:1;min-width:180px"><div>Total Items</div><h3 id="kpiItems">0</h3></div>
+          <div class="card" style="flex:1;min-width:180px"><div>Stock Value</div><h3 id="kpiValue">$0</h3></div>
+          <div class="card" style="flex:1;min-width:180px"><div>Sales Today</div><h3 id="kpiSales">$0</h3></div>
+          <div class="card" style="flex:1;min-width:180px"><div>Transfers</div><h3 id="kpiTransfers">0</h3></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>Add Stock</h3>
+        <div class="row">
+          <select id="addStore"><option>Store A</option><option>Store B</option><option>Store C</option></select>
+          <input id="addProduct" placeholder="Product (e.g., iPhone 17)" />
+          <input id="addCategory" placeholder="Category (phone, watch...)" />
+          <input id="addQty" type="number" min="1" value="1" />
+          <input id="addPrice" type="number" min="0" value="1000" />
+          <button id="addStockBtn">Add</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>Inventory (all stores)</h3>
+        <table>
+          <thead><tr><th>Store</th><th>Product</th><th>Category</th><th>Qty</th><th>Price</th><th>Status</th><th>Actions</th></tr></thead>
+          <tbody id="inventoryBody"></tbody>
+        </table>
+      </div>
+
+      <div class="card">
+        <h3>Store Transfer (simulate unavailable item scenario)</h3>
+        <div class="row">
+          <select id="transferFrom"><option>Store A</option><option>Store B</option><option>Store C</option></select>
+          <select id="transferTo"><option>Store A</option><option>Store B</option><option>Store C</option></select>
+          <input id="transferProduct" placeholder="Product" />
+          <input id="transferQty" type="number" min="1" value="1" />
+          <button id="transferBtn">Transfer</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>Repair Tickets (customer repairs)</h3>
+        <div class="row">
+          <input id="repairDevice" placeholder="Device" />
+          <input id="repairCustomer" placeholder="Customer" />
+          <input id="repairDue" type="date" />
+          <button id="repairBtn">Create Ticket</button>
+        </div>
+        <ul id="repairList"></ul>
+      </div>
+    </section>
+  </main>
+
+<script>
+const seed = [
+  {id: crypto.randomUUID(), store:'Store A', product:'iPhone 17', category:'phone', qty:2, price:1400, status:'active'},
+  {id: crypto.randomUUID(), store:'Store B', product:'Galaxy Z', category:'phone', qty:4, price:1200, status:'active'},
+  {id: crypto.randomUUID(), store:'Store C', product:'Apple Watch', category:'watch', qty:5, price:500, status:'active'}
+];
+
+const state = JSON.parse(localStorage.getItem('mstore_state') || 'null') || {
+  inventory: seed,
+  salesToday: 0,
+  transfers: 0,
+  repairs: []
+};
+
+function save(){ localStorage.setItem('mstore_state', JSON.stringify(state)); }
+
+function render(){
+  const tbody = document.getElementById('inventoryBody');
+  tbody.innerHTML = '';
+  state.inventory.forEach(item => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${item.store}</td>
+      <td>${item.product}</td>
+      <td>${item.category}</td>
+      <td>${item.qty}</td>
+      <td>$${item.price}</td>
+      <td><span class="pill">${item.status}</span></td>
+      <td>
+        <button onclick="sell('${item.id}')">Sell 1</button>
+        <button class="secondary" onclick="removeStock('${item.id}')">Remove 1</button>
+      </td>`;
+    tbody.appendChild(tr);
+  });
+
+  const totalItems = state.inventory.reduce((a,b)=>a+b.qty,0);
+  const stockValue = state.inventory.reduce((a,b)=>a+(b.qty*b.price),0);
+  document.getElementById('kpiItems').textContent = totalItems;
+  document.getElementById('kpiValue').textContent = '$' + stockValue.toLocaleString();
+  document.getElementById('kpiSales').textContent = '$' + state.salesToday.toLocaleString();
+  document.getElementById('kpiTransfers').textContent = state.transfers;
+
+  const repairList = document.getElementById('repairList');
+  repairList.innerHTML = state.repairs.map(r => `<li>${r.device} - ${r.customer} - due ${r.due} - status: ${r.status}</li>`).join('');
+
+  save();
+}
+
+function sell(id){
+  const item = state.inventory.find(x=>x.id===id);
+  if(!item || item.qty < 1) return alert('No stock available');
+  item.qty -= 1;
+  state.salesToday += item.price;
+  if(item.qty === 0) item.status = 'sold';
+  render();
+}
+
+function removeStock(id){
+  const item = state.inventory.find(x=>x.id===id);
+  if(!item || item.qty < 1) return alert('No stock available');
+  item.qty -= 1;
+  if(item.qty === 0) item.status = 'inactive';
+  render();
+}
+
+window.sell = sell;
+window.removeStock = removeStock;
+
+document.getElementById('loginBtn').onclick = () => {
+  const email = document.getElementById('email').value;
+  const pw = document.getElementById('password').value;
+  if(!email || !pw) return alert('Enter email and password');
+  document.getElementById('loginCard').classList.add('hidden');
+  document.getElementById('app').classList.remove('hidden');
+  render();
+};
+
+document.getElementById('addStockBtn').onclick = () => {
+  const store = document.getElementById('addStore').value;
+  const product = document.getElementById('addProduct').value.trim();
+  const category = document.getElementById('addCategory').value.trim() || 'other';
+  const qty = Number(document.getElementById('addQty').value);
+  const price = Number(document.getElementById('addPrice').value);
+  if(!product || qty < 1 || price < 0) return alert('Invalid stock data');
+  const existing = state.inventory.find(i => i.store===store && i.product.toLowerCase()===product.toLowerCase());
+  if(existing){ existing.qty += qty; existing.price = price; existing.status = 'active'; }
+  else { state.inventory.push({id: crypto.randomUUID(), store, product, category, qty, price, status:'active'}); }
+  render();
+};
+
+document.getElementById('transferBtn').onclick = () => {
+  const from = document.getElementById('transferFrom').value;
+  const to = document.getElementById('transferTo').value;
+  const product = document.getElementById('transferProduct').value.trim().toLowerCase();
+  const qty = Number(document.getElementById('transferQty').value);
+  if(from===to) return alert('Source and destination cannot be the same');
+  const source = state.inventory.find(i => i.store===from && i.product.toLowerCase()===product);
+  if(!source || source.qty < qty) return alert('Not enough source stock');
+  source.qty -= qty;
+  if(source.qty===0) source.status = 'reserved_for_transfer';
+
+  const dest = state.inventory.find(i => i.store===to && i.product.toLowerCase()===product);
+  if(dest){ dest.qty += qty; dest.status = 'active'; }
+  else {
+    state.inventory.push({
+      id: crypto.randomUUID(), store: to, product: source.product, category: source.category, qty,
+      price: source.price, status: 'active'
+    });
+  }
+  state.transfers += 1;
+  render();
+};
+
+document.getElementById('repairBtn').onclick = () => {
+  const device = document.getElementById('repairDevice').value.trim();
+  const customer = document.getElementById('repairCustomer').value.trim();
+  const due = document.getElementById('repairDue').value;
+  if(!device || !customer || !due) return alert('Fill all repair fields');
+  state.repairs.push({ id: crypto.randomUUID(), device, customer, due, status:'received' });
+  render();
+};
+</script>
+</body>
+</html>
