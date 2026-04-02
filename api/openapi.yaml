@@ -1,0 +1,159 @@
+openapi: 3.0.3
+info:
+  title: Multi-Store Mobile Shop API
+  version: 0.1.0
+servers:
+  - url: https://api.example.com
+paths:
+  /auth/login:
+    post:
+      summary: Login user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email: { type: string, format: email }
+                password: { type: string }
+      responses:
+        '200':
+          description: Authenticated
+
+  /inventory:
+    get:
+      summary: List inventory items
+      parameters:
+        - in: query
+          name: storeId
+          schema: { type: string, format: uuid }
+        - in: query
+          name: category
+          schema: { type: string }
+        - in: query
+          name: status
+          schema: { type: string }
+      responses:
+        '200':
+          description: Inventory list
+
+  /sales:
+    post:
+      summary: Create manual or POS-driven sale
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [storeId, channel, lines]
+              properties:
+                storeId: { type: string, format: uuid }
+                channel:
+                  type: string
+                  enum: [in_store, online]
+                lines:
+                  type: array
+                  items:
+                    type: object
+                    required: [productId, quantity, unitPrice]
+                    properties:
+                      productId: { type: string, format: uuid }
+                      inventoryItemId: { type: string, format: uuid }
+                      quantity: { type: integer, minimum: 1 }
+                      unitPrice: { type: number }
+      responses:
+        '201':
+          description: Sale created and stock updated
+
+  /sales/online/webhook:
+    post:
+      summary: Receive online sale event
+      responses:
+        '202':
+          description: Event accepted
+
+  /transfers:
+    post:
+      summary: Create store transfer request
+      responses:
+        '201':
+          description: Transfer created
+
+  /transfers/{id}/approve:
+    post:
+      summary: Approve transfer
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Transfer approved
+
+  /transfers/{id}/dispatch:
+    post:
+      summary: Dispatch transfer
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Transfer dispatched
+
+  /transfers/{id}/receive:
+    post:
+      summary: Receive transfer
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Transfer received and inventory moved
+
+  /deliveries:
+    post:
+      summary: Create delivery
+      responses:
+        '201':
+          description: Delivery created
+
+  /repairs/customer:
+    post:
+      summary: Create customer repair ticket
+      responses:
+        '201':
+          description: Repair created
+
+  /repairs/{id}/status:
+    patch:
+      summary: Update repair status
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Repair status updated
+
+  /dashboard/summary:
+    get:
+      summary: Dashboard KPIs
+      parameters:
+        - in: query
+          name: storeId
+          schema: { type: string, format: uuid }
+        - in: query
+          name: date
+          schema: { type: string, format: date }
+      responses:
+        '200':
+          description: KPI summary
